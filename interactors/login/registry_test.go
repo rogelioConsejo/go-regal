@@ -122,45 +122,246 @@ func TestUserRegistry_UserExists(t *testing.T) {
 
 func TestUserRegistry_ConfirmUserEmail(t *testing.T) {
 	t.Run("it should confirm the user email using the confirmation code", func(t *testing.T) {
-		/* The user doesn't need to provide the email again, if they received the email, then it is correct, so we ask
-		only for them to provide the username and the confirmation code.
-		*/
-		//TODO implement me
-		t.Skip("pending test")
+		// Setup
+		persistence := getSpyPersistence()
+		emailClient := getSpyEmailClient()
+		registry := NewUserRegistry(persistence, emailClient)
+
+		// Create a test user
+		userName := user.Name("testelio")
+		email := user.Email("testelio@emailprovider.com")
+		u, err := user.New(userName, email)
+		if err != nil {
+			t.Fatal("unexpected error when creating user entity:", err)
+		}
+
+		// Create the user which should generate and save a confirmation code
+		err = registry.CreateUser(u)
+		if err != nil {
+			t.Fatal("unexpected error when creating user:", err)
+		}
+
+		// Get the confirmation code that was saved
+		code, ok := persistence.confirmationCodes[userName]
+		if !ok {
+			t.Fatal("confirmation code was not saved")
+		}
+
+		// Confirm the email
+		err = registry.ConfirmUserEmail(userName, code)
+		if err != nil {
+			t.Fatal("unexpected error when confirming email:", err)
+		}
+
+		// Verify the email is confirmed
+		confirmed, err := registry.UserEmailIsConfirmed(userName)
+		if err != nil {
+			t.Fatal("unexpected error when checking email confirmation:", err)
+		}
+		if !confirmed {
+			t.Fatal("email should be confirmed but isn't")
+		}
 	})
 	t.Run("it should return an error if the confirmation code is invalid", func(t *testing.T) {
-		//TODO implement me
-		t.Skip("pending test")
+		// Setup
+		persistence := getSpyPersistence()
+		registry := NewUserRegistry(persistence, getSpyEmailClient())
+
+		// Create a test user
+		userName := user.Name("testelio")
+		email := user.Email("testelio@emailprovider.com")
+		u, err := user.New(userName, email)
+		if err != nil {
+			t.Fatal("unexpected error when creating user entity:", err)
+		}
+
+		// Create the user first
+		err = registry.CreateUser(u)
+		if err != nil {
+			t.Fatal("unexpected error when creating user:", err)
+		}
+
+		// Try to confirm with invalid code
+		invalidCode := ConfirmationCode("wrong-code")
+		err = registry.ConfirmUserEmail(userName, invalidCode)
+		if err == nil {
+			t.Fatal("expected error with invalid confirmation code but got none")
+		}
+
+		// Verify email remains unconfirmed
+		confirmed, err := registry.UserEmailIsConfirmed(userName)
+		if err != nil {
+			t.Fatal("unexpected error when checking confirmation:", err)
+		}
+		if confirmed {
+			t.Fatal("email should not be confirmed with invalid code")
+		}
 	})
+
 	t.Run("it should return an error if the user does not exist", func(t *testing.T) {
-		//TODO implement me
-		t.Skip("pending test")
+		persistence := getSpyPersistence()
+		registry := NewUserRegistry(persistence, getSpyEmailClient())
+
+		nonExistentUser := user.Name("nonexistent")
+		randomCode := ConfirmationCode("some-code")
+
+		err := registry.ConfirmUserEmail(nonExistentUser, randomCode)
+		if err == nil {
+			t.Fatal("expected error with non-existent user but got none")
+		}
 	})
 }
 
 func TestUserRegistry_UserEmailIsConfirmed(t *testing.T) {
 	t.Run("it should return true if the user email is confirmed", func(t *testing.T) {
-		//TODO implement me
-		t.Skip("pending test")
+		// Setup
+		persistence := getSpyPersistence()
+		registry := NewUserRegistry(persistence, getSpyEmailClient())
+
+		// Create and setup test user
+		userName := user.Name("testelio")
+		email := user.Email("testelio@emailprovider.com")
+		u, err := user.New(userName, email)
+		if err != nil {
+			t.Fatal("unexpected error when creating user entity:", err)
+		}
+
+		// Create user and confirm email
+		err = registry.CreateUser(u)
+		if err != nil {
+			t.Fatal("unexpected error when creating user:", err)
+		}
+
+		code := persistence.confirmationCodes[userName]
+		err = registry.ConfirmUserEmail(userName, code)
+		if err != nil {
+			t.Fatal("unexpected error when confirming email:", err)
+		}
+
+		// Check confirmation status
+		confirmed, err := registry.UserEmailIsConfirmed(userName)
+		if err != nil {
+			t.Fatal("unexpected error when checking confirmation status:", err)
+		}
+		if !confirmed {
+			t.Fatal("email should be confirmed")
+		}
 	})
+
 	t.Run("it should return false if the user email is not confirmed", func(t *testing.T) {
-		//TODO implement me
-		t.Skip("pending test")
+		// Setup
+		persistence := getSpyPersistence()
+		registry := NewUserRegistry(persistence, getSpyEmailClient())
+
+		// Create test user
+		userName := user.Name("testelio")
+		email := user.Email("testelio@emailprovider.com")
+		u, err := user.New(userName, email)
+		if err != nil {
+			t.Fatal("unexpected error when creating user entity:", err)
+		}
+
+		// Create user but don't confirm email
+		err = registry.CreateUser(u)
+		if err != nil {
+			t.Fatal("unexpected error when creating user:", err)
+		}
+
+		// Check confirmation status
+		confirmed, err := registry.UserEmailIsConfirmed(userName)
+		if err != nil {
+			t.Fatal("unexpected error when checking confirmation status:", err)
+		}
+		if confirmed {
+			t.Fatal("email should not be confirmed")
+		}
 	})
 }
 
 func TestUserRegistry_GetUserEmail(t *testing.T) {
 	t.Run("it should return the user email", func(t *testing.T) {
-		//TODO implement me
-		t.Skip("pending test")
+		// Setup
+		persistence := getSpyPersistence()
+		registry := NewUserRegistry(persistence, getSpyEmailClient())
+
+		// Create a test user
+		userName := user.Name("testelio")
+		expectedEmail := user.Email("testelio@emailprovider.com")
+		u, err := user.New(userName, expectedEmail)
+		if err != nil {
+			t.Fatal("unexpected error when creating user entity:", err)
+		}
+
+		// Create and confirm user email
+		err = registry.CreateUser(u)
+		if err != nil {
+			t.Fatal("unexpected error when creating user:", err)
+		}
+
+		// Confirm email
+		code := persistence.confirmationCodes[userName]
+		err = registry.ConfirmUserEmail(userName, code)
+		if err != nil {
+			t.Fatal("unexpected error when confirming email:", err)
+		}
+
+		// Get user email
+		email, err := registry.GetUserEmail(userName)
+		if err != nil {
+			t.Fatal("unexpected error when getting user email:", err)
+		}
+
+		if email != expectedEmail {
+			t.Fatalf("expected email %s but got %s", expectedEmail, email)
+		}
+	})
+	t.Run("it return ErrGettingUserEmail when persistence fails", func(t *testing.T) {
+		persistence := getSpyPersistence()
+		registry := NewUserRegistry(persistence, getSpyEmailClient())
+
+		persistence.setFailOnGetEmail(true)
+
+		_, err := registry.GetUserEmail("test-user")
+		if !errors.Is(err, ErrGettingUserEmail) {
+			t.Fatalf("expected error to be of type ErrGettingUserEmail, got: %v", err)
+		}
 	})
 	t.Run("it should return an error if the user does not exist", func(t *testing.T) {
-		//TODO implement me
-		t.Skip("pending test")
+		persistence := getSpyPersistence()
+		registry := NewUserRegistry(persistence, getSpyEmailClient())
+
+		_, err := registry.GetUserEmail("nonexistent")
+		if err == nil {
+			t.Fatal("expected error with non-existent user but got none")
+		}
+
 	})
 	t.Run("it should return an error if the user email is not confirmed", func(t *testing.T) {
-		//TODO implement me
-		t.Skip("pending test")
+		persistence := getSpyPersistence()
+		registry := NewUserRegistry(persistence, getSpyEmailClient())
+
+		// Create a test user
+		userName := user.Name("testelio")
+		email := user.Email("testelio@emailprovider.com")
+		u, err := user.New(userName, email)
+		if err != nil {
+			t.Fatal("unexpected error creating user:", err)
+		}
+
+		// Save user but don't confirm email
+		err = registry.CreateUser(u)
+		if err != nil {
+			t.Fatal("unexpected error saving user:", err)
+		}
+
+		// Try to get email of unconfirmed user
+		_, err = registry.GetUserEmail(userName)
+		if !errors.Is(err, ErrEmailNotConfirmed) {
+			t.Fatalf("expected %v but got: %v", ErrEmailNotConfirmed, err)
+		}
+		if !errors.Is(err, ErrGettingUserEmail) {
+			t.Fatalf("expected %v but got: %v", ErrGettingUserEmail, err)
+		}
 	})
 }
 
@@ -169,15 +370,50 @@ func getSpyPersistence() *spyPersistence {
 		users:             make(map[user.Name]user.User),
 		calls:             make(map[string][]interface{}),
 		confirmationCodes: make(map[user.Name]ConfirmationCode),
+		confirmedEmails:   make(map[user.Name]bool),
 	}
 }
 
 type spyPersistence struct {
 	users             map[user.Name]user.User
 	confirmationCodes map[user.Name]ConfirmationCode
+	confirmedEmails   map[user.Name]bool // New field
 	calls             map[string][]interface{}
 	failOnSave        bool
 	failOnCheck       bool
+	failOnGetEmail    bool
+}
+
+func (s *spyPersistence) GetUserEmail(name user.Name) (user.Email, error) {
+	if s.failOnGetEmail {
+		return "", errors.New("failed to get email")
+	}
+	u, exists := s.users[name]
+	if !exists {
+		return "", errors.New("user not found")
+	}
+	return u.Email(), nil
+}
+
+func (s *spyPersistence) GetConfirmationCode(u user.Name) (ConfirmationCode, error) {
+	code, exists := s.confirmationCodes[u]
+	if !exists {
+		return "", errors.New("confirmation code not found")
+	}
+	return code, nil
+}
+
+func (s *spyPersistence) MarkEmailAsConfirmed(u user.Name) error {
+	s.confirmedEmails[u] = true
+	return nil
+}
+
+func (s *spyPersistence) IsEmailConfirmed(u user.Name) (bool, error) {
+	confirmed, exists := s.confirmedEmails[u]
+	if !exists {
+		return false, nil
+	}
+	return confirmed, nil
 }
 
 func (s *spyPersistence) UserWasSaved(u user.Name) (bool, error) {
@@ -210,6 +446,10 @@ func (s *spyPersistence) setFailOnSaveUser(sw bool) {
 
 func (s *spyPersistence) setFailOnCheckUser(b bool) {
 	s.failOnCheck = b
+}
+
+func (s *spyPersistence) setFailOnGetEmail(b bool) {
+	s.failOnGetEmail = b
 }
 
 var _ RegistryPersistence = &spyPersistence{}
